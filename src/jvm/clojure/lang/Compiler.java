@@ -1441,6 +1441,7 @@ static class InstanceMethodExpr extends MethodExpr{
 	public final int column;
 	public final Symbol tag;
 	public final java.lang.reflect.Method method;
+	public final Class<?> targetType;
 
 	final static Method invokeInstanceMethodMethod =
 			Method.getMethod("Object invokeInstanceMethod(Object,String,Object[])");
@@ -1455,6 +1456,9 @@ static class InstanceMethodExpr extends MethodExpr{
 		this.methodName = methodName;
 		this.target = target;
 		this.tag = tag;
+
+		Class<?> type = null;
+
 		if(target.hasJavaClass() && target.getJavaClass() != null)
 			{
 			List methods = Reflector.getMethods(target.getJavaClass(), args.count(), methodName, false);
@@ -1487,8 +1491,10 @@ static class InstanceMethodExpr extends MethodExpr{
 						(java.lang.reflect.Method) (methodidx >= 0 ? methods.get(methodidx) : null);
 				if(m != null && !Modifier.isPublic(m.getDeclaringClass().getModifiers()))
 					{
-					//public method of non-public class, try to find it in hierarchy
-					m = Reflector.getAsMethodOfPublicBase(m.getDeclaringClass(), m);
+					//public method of non-public class, try to find a public descendant
+					if((type=Reflector.getDeepestPublicDescendant(m.getDeclaringClass(), target.getJavaClass())) == null)
+						//if descendant not found, try to find an ancestor
+						m = Reflector.getAsMethodOfPublicBase(m.getDeclaringClass(), m);
 					}
 				method = m;
 				if(method == null && RT.booleanCast(RT.WARN_ON_REFLECTION.deref()))
@@ -1509,6 +1515,8 @@ static class InstanceMethodExpr extends MethodExpr{
 						SOURCE_PATH.deref(), line, column, methodName);
 				}
 			}
+
+		targetType = (type == null && method != null) ? method.getDeclaringClass() : type;
 	}
 
 	public Object eval() {
@@ -1542,7 +1550,7 @@ static class InstanceMethodExpr extends MethodExpr{
 	public void emitUnboxed(C context, ObjExpr objx, GeneratorAdapter gen){
 		if(method != null)
 			{
-			Type type = Type.getType(method.getDeclaringClass());
+			Type type = Type.getType(targetType);
 			target.emit(C.EXPRESSION, objx, gen);
 			//if(!method.getDeclaringClass().isInterface())
 			gen.checkCast(type);
@@ -1554,7 +1562,7 @@ static class InstanceMethodExpr extends MethodExpr{
 				method.emitClearLocals(gen);
 				}
 			Method m = new Method(methodName, Type.getReturnType(method), Type.getArgumentTypes(method));
-			if(method.getDeclaringClass().isInterface())
+			if(targetType.isInterface())
 				gen.invokeInterface(type, m);
 			else
 				gen.invokeVirtual(type, m);
@@ -1566,7 +1574,7 @@ static class InstanceMethodExpr extends MethodExpr{
 	public void emit(C context, ObjExpr objx, GeneratorAdapter gen){
 		if(method != null)
 			{
-			Type type = Type.getType(method.getDeclaringClass());
+			Type type = Type.getType(targetType);
 			target.emit(C.EXPRESSION, objx, gen);
 			//if(!method.getDeclaringClass().isInterface())
 			gen.checkCast(type);
@@ -1578,7 +1586,7 @@ static class InstanceMethodExpr extends MethodExpr{
 				method.emitClearLocals(gen);
 				}
 			Method m = new Method(methodName, Type.getReturnType(method), Type.getArgumentTypes(method));
-			if(method.getDeclaringClass().isInterface())
+			if(targetType.isInterface())
 				gen.invokeInterface(type, m);
 			else
 				gen.invokeVirtual(type, m);

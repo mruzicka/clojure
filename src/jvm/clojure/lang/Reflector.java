@@ -16,7 +16,9 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 
@@ -525,5 +527,35 @@ public static Object prepRet(Class c, Object x){
 //	else if(x instanceof Float)
 //			return Double.valueOf(((Float) x).doubleValue());
 	return x;
+}
+
+public static Class<?> getDeepestPublicDescendant(Class<?> baseClass, Class<?> descendantClass){
+	ArrayDeque<Class<?>> toDo = new ArrayDeque<Class<?>>();
+	HashSet<Class<?>> seen = new HashSet<Class<?>>();
+	boolean baseIsInterface =  Modifier.isInterface(baseClass.getModifiers());
+
+	do
+		{
+		if(descendantClass == baseClass)
+			continue;
+
+		if(Modifier.isPublic(descendantClass.getModifiers()))
+			return descendantClass;
+
+		if(baseIsInterface)
+			for(Class<?> iface : descendantClass.getInterfaces())
+				if(baseClass.isAssignableFrom(iface) && !seen.contains(iface))
+					{
+					toDo.add(iface);
+					seen.add(iface);
+					}
+
+		Class<?> superClass = descendantClass.getSuperclass();
+		if(superClass != null && baseClass.isAssignableFrom(superClass))
+			toDo.add(superClass);
+		}
+	while((descendantClass = toDo.pollFirst()) != null);
+
+	return null;
 }
 }

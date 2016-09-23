@@ -10,7 +10,8 @@
 
 
 (ns clojure.test-clojure.compilation
-  (:import (clojure.lang Compiler Compiler$CompilerException))
+  (:import (clojure.lang Compiler Compiler$CompilerException)
+           (compilation MethodInvocationTest$Factory MethodSelectionTest$Factory))
   (:require [clojure.test.generative :refer (defspec)]
             [clojure.data.generators :as gen]
             [clojure.test-clojure.compilation.line-number-examples :as line])
@@ -395,3 +396,13 @@
       ;; eventually call `load` and reset called?.
       (require 'clojure.repl :reload))
     (is @called?)))
+
+;; See CLJ-1243
+(deftest invoking-nonpublic-interface-method-on-nonpublic-class
+  (is (= "stuff" (-> (MethodInvocationTest$Factory/get) .stuff))))
+
+;; this demostrates a change in selecting a method to call introduced in CLJ-1243
+;; prior to the changes the MethodSelectionTestImplementation.stuff(Object p)
+;; would have been called
+(deftest selecting-method-on-nonpublic-interface
+  (is (= "string stuff" (-> (MethodSelectionTest$Factory/get) (.stuff "")))))
